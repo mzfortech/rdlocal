@@ -49,6 +49,10 @@ checked without the data.  Simulation designs of CCT (2014) supplement S.3.1 pro
 Covariate adjustment (CCFT 2019), multiple cutoffs/scores, kink designs, McCrary (2008) test, restricted
 density model and jackknife SE, CER arg-min bandwidth, local randomisation / power tools.
 
+## Methodology
+
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) explains the statistics (local polynomial RD, bandwidth selection, robust bias-corrected inference, manipulation testing), how the package was built, and the validation evidence, including the reproduced US Senate results and the one open problem.
+
 ## Provenance
 
 An independent clean-room implementation written from the papers listed in `CLEANROOM.md`.  It is not
