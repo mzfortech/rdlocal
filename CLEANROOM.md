@@ -4,6 +4,21 @@
 contains no code, docstrings or documentation text from, the GPL-3.0 packages `rdrobust`, `rddensity`,
 `lpdensity`, `rdmulti`, `rdpower`, `rdlocrand` or `rdhte` (any language, any version).
 
+## v0.2 scope widening (owner-approved)
+
+Published journal articles that describe the rdpackages algorithms may be read as specifications. Still
+forbidden: any source code, help files (.sthlp/.Rd), docstrings, CRAN reference manuals, vignettes, READMEs
+or repository files of the rdpackages. Articles added in v0.2 are in the table below (CCFT2017, CJM2018 for
+its bandwidth section, RJ2015). The Stata Journal 2014 rdrobust article (14(4):909-946) could not be
+downloaded (the ageconsearch record that was tried, 340127, is a different article: Cattaneo et al. 2016 on
+local randomization; its PDF is stored but unused).
+
+**Result of the widening:** these articles state *which* bandwidth selectors exist and how they relate
+(CER scaling, combination rules, the generic form h = (V/n / (2(1+p)B))^(1/(3+2p))) but defer the exact
+preliminary (pilot) estimators and the regularisation scaling to the supplemental appendices of CCFT / CJM,
+which are not obtainable. So the data-driven h, b of rdrobust and rddensity cannot be reproduced to 1%
+from permitted text; see "Remaining deviations".
+
 ## Rules followed
 
 1. No file of those packages was opened, grepped, viewed or copied: nothing under `site-packages/rd*` or
@@ -28,6 +43,9 @@ contains no code, docstrings or documentation text from, the GPL-3.0 packages `r
 | CJM2020 | Cattaneo, Jansson, Ma (2020), *Simple Local Polynomial Density Estimators*, JASA (arXiv version with supplement) | https://arxiv.org/pdf/1811.11512 | a7bba884a967a087e9eb1d298294fd0d1b27b931e03b8f16ba391eddd5da31a8 |
 | CJM2018 | Cattaneo, Jansson, Ma (2018), *Manipulation testing based on density discontinuity*, Stata Journal 18(1) (downloaded; formulas taken from CJM2020, this paper is software-oriented) | https://ageconsearch.umn.edu/record/340234/files/Cattaneo.pdf | 9b7216e5943350224b814740d5934aefc8c12e193815764e389d61f079fafcd3 |
 | IK2012 | Imbens, Kalyanaraman (2012), *Optimal bandwidth choice for the regression discontinuity estimator*, REStud (NBER WP 14726) | https://www.nber.org/system/files/working_papers/w14726/w14726.pdf | 1f86127ab69d51a07af5d36cef39415660bdfdfca63d36bfd52cbc7f7b29d60b |
+| CCFT2017 | Calonico, Cattaneo, Farrell, Titiunik (2017), *rdrobust: Software for regression-discontinuity designs*, Stata Journal 17(2):372-404 (sec. 2.3 bandwidth selectors; sec. 7 published Senate output) | https://ageconsearch.umn.edu/record/340181/files/Calonico.pdf | c41e81d2b3763ea5e2ac060747f7c6a22cf6ae3f7fd27d44dfece82e2fe63c8a |
+| RJ2015 | Calonico, Cattaneo, Titiunik (2015), *rdrobust: An R Package for Robust Nonparametric Inference in RD Designs*, The R Journal 7(1) | https://journal.r-project.org/archive/2015/RJ-2015-004/RJ-2015-004.pdf | b43c6d0f7188e5bcb56f92c99328a9a786ad1f2ef79f9d4ebc8ac6ba1b93b637 |
+| (unused) | Cattaneo, Titiunik, Vazquez-Bare (2016), Stata Journal 16(2) - downloaded by mistake while looking for the 2014 rdrobust article | https://ageconsearch.umn.edu/record/340127/files/Cattaneo.pdf | 957f0118bfcf2559d5ced1ef31d254609086abfbd523a252ff3d38cb1f18e498 |
 | CIT2019 | Cattaneo, Idrobo, Titiunik (2019), *A Practical Introduction to RD Designs: Foundations* (arXiv) - consulted for context and for a data source; no formula taken | https://arxiv.org/pdf/1911.09511 | a4f103e8518fb871503c22cceb179a4f614de43edd6d85236a489022b4c67ed3 |
 | Lee2008 | Lee (2008), J. Econometrics - downloaded, only for the data search; not used | https://www.princeton.edu/~davidlee/wp/randomizerdfinal2.pdf | 49c81381c74d9560e5429ba8e279b30f9bd22b2ed3174aa02b0a3ff7f37876d9 |
 
@@ -47,7 +65,7 @@ the McCrary option is not provided), Lee's replication files (see "Published exa
 | `_kernels.silverman_const` | CCT2014-S S.2.6 Step 0 (i): 2.58 (triangular); general formula printed there |
 | `bandwidth.deriv_var` | V_hat_{nu,p}(h), CCT2014-S S.2.6 |
 | `bandwidth._ik` | IK2012 Section 4.2, eqs (4.8)-(4.13), C_K = 3.4375 (edge kernel) |
-| `bandwidth.rd_bandwidth(bwselect="cerrd")` | CCF2020 Section 5 (rule-of-thumb CER bandwidth n^(-p/((2p+3)(p+3))) h_MSE; G replaces n with clusters, Sec 5.2) |
+| `bandwidth.rd_bandwidth` variants (`rd`, `two`, `sum`, `comb1`, `comb2`, `cer*`) | CCFT2017 sec. 2.3 (estimands rd/l/r/sum, h_cer = n^(-p/((3+p)(3+2p))) h_mse, comb rules; identical to CCF2020 sec. 5, G replaces n with clusters). Published Senate output on p.400 (n=1297: mserd 17.708 -> cerrd 12.374; b unchanged by CER; b side-specific for msetwo) is checked in tests |
 | `density._side` | CJM2020 Sec. 2 (estimator), Thm 2 (variance estimator, evaluated as (1/n) sum_jk c_j c_k [F(x_j ^ x_k) - F_j F_k]) |
 | `density.rd_density_test` statistic | CJM2020 Sec. 4 (T_p, Corollary 1, robust T_{p+1}(h_p)) |
 | `density._h_mse` | CJM2020 Sec. 3.1 (h_MSE = (V/(2pB^2))^(1/(1+2p)) n^(-1/(1+2p))); see deviations |
@@ -62,10 +80,11 @@ the McCrary option is not provided), Lee's replication files (see "Published exa
    (Lee-1 design, n=1000: h = 0.073 vs 0.110 with the coefficient-scale version; black-box value 0.114).
 2. **Step 2 order.** The print writes `beta_{p+1}(b_n)` (an order p+1 fit); we use the order-q fit at b_n,
    consistent with `V_hat_{p+1,q}(b_n)` in the same bracket. Identical for the default q = p+1.
-3. **`msetwo`.** No paper obtained states the two-bandwidth selector; Step 2 is applied to each side
-   separately (own variance, own bias term).
-4. **`cerrd`.** Only the rule-of-thumb rescaling of CCF2020 Sec. 5 is implemented, not the arg-min over the
-   Edgeworth terms Q_RBC,1..3. `b` is not rescaled.
+3. **`msetwo`/`msesum`.** The selectors exist per CCFT2017 sec. 2.3 and the b-per-side structure is confirmed by
+   its printed table, but the formulas are ours: the same Step 1-2 expressions with the one-sided bias terms
+   (two) or the sum of one-sided bias terms (sum) replacing the difference.
+4. (resolved in 0.2) `cerrd`: now exactly the published rule n^(-p/((3+p)(3+2p))) h_mse with b unchanged; only
+   the arg-min over Edgeworth terms of CCF2020 is not implemented (not part of rdrobust's `cerrd` per CCFT2017).
 5. **Fuzzy bandwidth.** The MSE problem for the ratio is solved as the sharp problem for the pseudo-outcome
    `Y - tau0 T` (CCT2014-S Lemma 2 shows bias and variance take this form), with `tau0` from local fits at the
    Silverman pilot bandwidth. The pilot choice is ours.
@@ -85,6 +104,21 @@ the McCrary option is not provided), Lee's replication files (see "Published exa
 10. **Density restricted model, jackknife and plug-in SEs** are not implemented (unrestricted model, Thm 2 SE).
 11. **Pilot c_n** uses a global polynomial of degree q+2 (the print says "(m+1)th-order" for a vector
     r_m = (1,...,x^m); we read it as degree m = q+2). Trying degree q+3 made agreement with the black box worse.
+
+## Remaining deviations after v0.2 (why 1% on h, b is not reached)
+
+* **rdrobust h, b.** Measured gap vs the black box on the five designs: h 6%-31% low, b from 32% low to 4.5% high (see README
+  table); a grid of 36 plausible readings of the printed procedure (pilot polynomial degree, c_n rule, 0/1/3
+  regularisation scaling with and without the nu!^2 factor) never got below 28% max error, and feeding the
+  black box's own b into our Step 2 leaves 0.2%-8% on h. CCFT2017 sec. 2.3 (pp.379-381) says the upgraded
+  selector's preliminary estimates and its regularisation "are discussed in the supplemental appendix of
+  CCFT"; RJ2015 pp.40-41 only gives h_MSE = C n^(-1/(2p+3)) and defers to the supplements of IK and CCT.
+  That supplement is the missing specification.
+* **rddensity h.** CJM2018 sec. 2.5 specifies the family (h_l, h_r, h_diff, h_sum, comb = median / min) but
+  says the constants "rely on preliminary rule-of-thumb estimators" without stating them; CJM2020 sec. 3.1 only
+  says F^(p+1) can come from a local polynomial or "a reference model". A normal-reference reading of that
+  family gave 0.24-0.35 vs the black box's 0.27-0.33 (side-wise) and 0.59-0.96 (pooled): not within 1%.
+  Our default stays the single common h of deviation 8.
 
 ## Choices informed by black-box agreement (all with a paper passage behind them)
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from math import factorial
 
 import numpy as np
@@ -107,54 +108,68 @@ def _pre_pilot(xc, y, p, kernel):
 
 # ---------------------------------------------------------------- CCT plug-in
 
-def _cct(xc, y, p, q, kernel, two_sided):
+def _cct(xc, y, p, q, kernel):
+    """CCT (2014) supplement S.2.6 plug-in, for the three estimands named in CCFT (2017, sec. 2.3):
+    rd (difference of one-sided estimators), two (each side alone), sum (sum of one-sided estimators).
+
+    Returns {variant: (h_left, h_right, b_left, b_right)}.  The variants differ only in which one-sided
+    bias terms are combined (difference, one side, sum) and in whose variances are added.
+    """
     n = len(xc)
-    sgn = (-1) ** (p + 1)
     v = _pre_pilot(xc, y, p, kernel)
-
-    # NN variances are residuals of the data themselves, independent of the fit.
     s2 = sigma2_nn(xc, y)
+    S = (1, -1)
 
-    # Step 0 (ii): pilot c_n via global (q+2)-th order polynomial fits (CCT supp. S.2.6).
-    fq1 = {s: fit_enough(xc, v, q + 1, kernel, s) for s in (1, -1)}
-    Vq1 = sum(deriv_var(fq1[s], s2, q + 1) for s in (1, -1))
+    # Step 0 (ii): pilot c_n via global (q+2)-th order polynomial fits.  Estimand-independent.
+    fq1 = {s: fit_enough(xc, v, q + 1, kernel, s) for s in S}
+    Vq1 = sum(deriv_var(fq1[s], s2, q + 1) for s in S)
     Bq1 = lead_const(kernel, q + 1, q + 1)
     g = _global_coef(xc, y, q + 2, q + 2, 1) - (-1) ** q * _global_coef(xc, y, q + 2, q + 2, -1)
     Cc = (2 * q + 3) * n * v ** (2 * q + 3) * Vq1 / (2 * Bq1**2 * g**2)
-    c_n = (Cc * 1.0) ** (1 / (2 * q + 5)) * n ** (-1 / (2 * q + 5)) if np.isfinite(Cc) and Cc > 0 else v
-
-    # Step 1: b_n.
-    fc = {s: fit_enough(xc, c_n, q + 1, kernel, s) for s in (1, -1)}
-    dq = coef(fc[1], y, q + 1) - (-1) ** (q + 1) * coef(fc[-1], y, q + 1)
-    Vcc = sum(deriv_var(fc[s], s2, q + 1) for s in (1, -1))
-    fv = {s: fit_enough(xc, v, q, kernel, s) for s in (1, -1)}
-    Vpq = sum(deriv_var(fv[s], s2, p + 1) for s in (1, -1))
+    c_n = Cc ** (1 / (2 * q + 5)) * n ** (-1 / (2 * q + 5)) if np.isfinite(Cc) and Cc > 0 else v
+    fc = {s: fit_enough(xc, c_n, q + 1, kernel, s) for s in S}
+    cq = {s: coef(fc[s], y, q + 1) for s in S}
+    Vcc = {s: deriv_var(fc[s], s2, q + 1) / factorial(q + 1) ** 2 for s in S}  # DEVIATION 1 (coefficient scale)
+    fv = {s: fit_enough(xc, v, q, kernel, s) for s in S}
+    Vpq = {s: deriv_var(fv[s], s2, p + 1) for s in S}
     Bpq = lead_const(kernel, q, p + 1)
-    # DEVIATION: the printed bracket adds 3*V_hat (derivative-scale variance, carries nu!^2) to a squared
-    # Taylor coefficient; the regularisation is applied in coefficient scale (V_hat / nu!^2) so both terms
-    # share units.  Verbatim form would give materially smaller bandwidths (see CLEANROOM.md).
-    Cb = (2 * p + 3) * n * v ** (2 * p + 3) * Vpq / (2 * (q - p) * Bpq**2 * (dq**2 + 3 * Vcc / factorial(q + 1) ** 2))
-    b = Cb ** (1 / (2 * q + 3)) * n ** (-1 / (2 * q + 3))
-
-    # Step 2: h_n.
-    fb = {s: fit_enough(xc, b, q, kernel, s) for s in (1, -1)}
-    mb = {s: coef(fb[s], y, p + 1) for s in (1, -1)}
-    Vb = {s: deriv_var(fb[s], s2, p + 1) for s in (1, -1)}
-    fp = {s: fit_enough(xc, v, p, kernel, s) for s in (1, -1)}
-    V0 = {s: deriv_var(fp[s], s2, 0) for s in (1, -1)}
+    fp = {s: fit_enough(xc, v, p, kernel, s) for s in S}
+    V0 = {s: deriv_var(fp[s], s2, 0) for s in S}
     B0 = lead_const(kernel, p, 0)
-    if not two_sided:
-        d = mb[1] - sgn * mb[-1]
-        Ch = n * v * (V0[1] + V0[-1]) / (2 * (p + 1) * B0**2 * (d**2 + 3 * (Vb[1] + Vb[-1]) / factorial(p + 1) ** 2))
-        hh = Ch ** (1 / (2 * p + 3)) * n ** (-1 / (2 * p + 3))
-        return {1: hh, -1: hh}, {1: b, -1: b}
-    # DEVIATION (msetwo): the papers obtained do not state the two-bandwidth selector; the
-    # same Step-2 formula is applied to each side separately (own variance, own bias term).
+
+    # sign with which the LEFT one-sided bias enters: difference -> -(-1)^k, sum -> +(-1)^k, k = order+1
+    def comb(a, bm, k, kind):
+        if kind == "rd":
+            return a[1] - (-1) ** k * a[-1]
+        if kind == "sum":
+            return a[1] + (-1) ** k * a[-1]
+        raise ValueError
+
     out = {}
-    for s in (1, -1):
-        Ch = n * v * V0[s] / (2 * (p + 1) * B0**2 * (mb[s] ** 2 + 3 * Vb[s] / factorial(p + 1) ** 2))
-        out[s] = Ch ** (1 / (2 * p + 3)) * n ** (-1 / (2 * p + 3))
-    return out, {1: b, -1: b}
+    for kind in ("rd", "sum", "two"):
+        sides = [(1,), (-1,)] if kind == "two" else [S]
+        hh, bb = {}, {}
+        for grp in sides:
+            def tot(d):
+                return sum(d[s] for s in grp)
+            # Step 1: b
+            if kind == "two":
+                d1 = cq[grp[0]]
+            else:
+                d1 = comb(cq, q + 1, q + 1, kind)
+            Cb = (2 * p + 3) * n * v ** (2 * p + 3) * tot(Vpq) / (
+                2 * (q - p) * Bpq**2 * (d1**2 + 3 * tot(Vcc)))
+            b = Cb ** (1 / (2 * q + 3)) * n ** (-1 / (2 * q + 3))
+            fb = {s: fit_enough(xc, b, q, kernel, s) for s in grp}
+            mb = {s: coef(fb[s], y, p + 1) for s in grp}
+            Vb = sum(deriv_var(fb[s], s2, p + 1) for s in grp) / factorial(p + 1) ** 2
+            d2 = mb[grp[0]] if kind == "two" else comb(mb, p + 1, p + 1, kind)
+            Ch = n * v * tot(V0) / (2 * (p + 1) * B0**2 * (d2**2 + 3 * Vb))
+            h = Ch ** (1 / (2 * p + 3)) * n ** (-1 / (2 * p + 3))
+            for s in grp:
+                hh[s], bb[s] = h, b
+        out[kind] = (hh[-1], hh[1], bb[-1], bb[1])
+    return out
 
 
 # ---------------------------------------------------------------- IK
@@ -192,8 +207,9 @@ def rd_bandwidth(y, x, cutoff=0.0, *, fuzzy=None, p=1, q=None, kernel="triangula
                  bwselect="mserd", cluster=None) -> BandwidthResult:
     """Data-driven bandwidths for RD estimation.
 
-    bwselect: "mserd" (common MSE), "msetwo" (side-specific MSE), "cerrd" (rule-of-thumb CER,
-    CCF 2020 sec. 5: n^(-p/((2p+3)(p+3))) times the MSE bandwidth), "ik" (IK 2012).
+    bwselect: "mse"/"cer" + "rd" (common, default "mserd"), "two" (side-specific), "sum" (MSE of the sum of
+    one-sided estimators), "comb1" (min of rd and sum), "comb2" (per-side median of two, rd, sum), as listed in
+    CCFT (2017) sec. 2.3.  CER = n^(-p/((3+p)(3+2p))) times the MSE bandwidth.  "ik": IK (2012).
     """
     kernel = kernel_name(kernel)
     q = p + 1 if q is None else q
@@ -216,15 +232,28 @@ def rd_bandwidth(y, x, cutoff=0.0, *, fuzzy=None, p=1, q=None, kernel="triangula
         ty = sum(s * (fits[s].coef_weights(0) @ y[fits[s].idx]) for s in (1, -1))
         td = sum(s * (fits[s].coef_weights(0) @ fz[fits[s].idx]) for s in (1, -1))
         z = y - ty / td * fz
-    base = {"mserd": "mserd", "msetwo": "msetwo", "cerrd": "mserd", "certwo": "msetwo"}.get(bwselect)
-    if base is None:
-        raise ValueError("bwselect must be one of mserd, msetwo, cerrd, certwo, ik")
-    h, b = _cct(xc, z, p, q, kernel, base == "msetwo")
+    m = re.fullmatch(r"(mse|cer)(rd|two|sum|comb1|comb2)", bwselect)
+    if not m:
+        raise ValueError("bwselect must be mse|cer + rd|two|sum|comb1|comb2, or ik")
+    kind, variant = m.groups()
+    allv = _cct(xc, z, p, q, kernel)
+    rd, two, sm = allv["rd"], allv["two"], allv["sum"]   # (hl, hr, bl, br)
+    if variant in ("rd", "two", "sum"):
+        hl, hr, bl, br = allv[variant]
+    elif variant == "comb1":  # CCFT 2017 sec. 2.3: h_comb = min(h_rd, h_sum); b follows the chosen one
+        hl, hr, bl, br = rd if rd[0] <= sm[0] else sm
+    else:  # comb2: per side the median of (two, rd, sum); b of the selected estimator
+        pick = {}
+        for i_, nm in ((0, "l"), (1, "r")):
+            cands = sorted([(two[i_], two[i_ + 2]), (rd[i_], rd[i_ + 2]), (sm[i_], sm[i_ + 2])])
+            pick[nm] = cands[1]
+        hl, bl = pick["l"]
+        hr, br = pick["r"]
     scale = 1.0
-    if bwselect.startswith("cer"):
+    if kind == "cer":  # CCFT 2017 sec. 2.3 / CCF 2020 sec. 5: n^(-p/((3+p)(3+2p))) h_mse
         N = len(np.unique(cl)) if cl is not None else len(xc)
-        scale = N ** (-p / ((2 * p + 3) * (p + 3)))
+        scale = N ** (-p / ((3 + p) * (3 + 2 * p)))
     cap = {1: np.abs(xc[xc >= 0]).max(), -1: np.abs(xc[xc < 0]).max()}
-    hh = {s: float(min(h[s] * scale, cap[s])) for s in (1, -1)}
-    bb = {s: float(min(b[s], cap[s])) for s in (1, -1)}
+    hh = {1: float(min(hr * scale, cap[1])), -1: float(min(hl * scale, cap[-1]))}
+    bb = {1: float(min(br, cap[1])), -1: float(min(bl, cap[-1]))}
     return BandwidthResult(hh[-1], hh[1], bb[-1], bb[1], bwselect, kernel, p, q, nL, nR)
