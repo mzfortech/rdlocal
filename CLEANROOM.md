@@ -4,22 +4,22 @@
 contains no code, docstrings or documentation text from, the GPL-3.0 packages `rdrobust`, `rddensity`,
 `lpdensity`, `rdmulti`, `rdpower`, `rdlocrand` or `rdhte` (any language, any version).
 
-## v0.2 scope widening (owner-approved)
+## Development iteration 2: scope widening (owner-approved)
 
 Published journal articles that describe the rdpackages algorithms may be read as specifications. Still
 forbidden: any source code, help files (.sthlp/.Rd), docstrings, CRAN reference manuals, vignettes, READMEs
-or repository files of the rdpackages. Articles added in v0.2 are in the table below (CCFT2017, CJM2018 for
+or repository files of the rdpackages. Articles added in iteration 2 are in the table below (CCFT2017, CJM2018 for
 its bandwidth section, RJ2015). The Stata Journal 2014 rdrobust article (14(4):909-946) could not be
 downloaded (the ageconsearch record that was tried, 340127, is a different article: Cattaneo et al. 2016 on
 local randomization; its PDF is stored but unused).
 
-**Result of the v0.2 widening:** these articles state *which* bandwidth selectors exist and how they relate
+**Result of the iteration 2 widening:** these articles state *which* bandwidth selectors exist and how they relate
 (CER scaling, combination rules, the generic form h = (V/n / (2(1+p)B))^(1/(3+2p))) but defer the exact
 preliminary (pilot) estimators and the regularisation scaling to the supplemental appendices of CCFT / CJM,
 which are not obtainable. So the data-driven h, b of rdrobust and rddensity cannot be reproduced to 1%
 from permitted text; see "Remaining deviations".
 
-## v0.3: the missing specification
+## Development iteration 3: the missing specification
 
 The owner supplied the journal supplements above (hosted under rdpackages.github.io/references/; only those
 files were fetched, nothing else on that site). CCFT2019-S Section 12 specifies the rdrobust-family
@@ -129,11 +129,11 @@ the McCrary option is not provided), Lee's replication files (see "Published exa
 12. **Fuzzy selector.** The pilot tau_0 (and thus the pseudo-outcome) differs from rdrobust's: fuzzy h is 12% low
     with scaleregul=1 and 75% low with scaleregul=0 (Lee-fuzzy).
 
-## Remaining deviations after v0.3
+## Remaining deviations after development iteration 3
 
 * rdrobust h, b: the d_hat pilot above (CCFT2019-S Section 12.2, p.68, display for B_ring). With it fixed, the rest
   of the chain (Steps 1 and 3, regularisation, combination and CER rules) is already at <=1%.
-* rddensity h: not specified by either supplement (they do not discuss the density test); the v0.2 rule stays.
+* rddensity h: not specified by either supplement (they do not discuss the density test); the iteration 2 rule stays.
 * Fuzzy selector pilot (deviation 12); `msetwo`/`msesum` inherit the d_hat error.
 
 ## Choices informed by black-box agreement (all with a paper passage behind them)

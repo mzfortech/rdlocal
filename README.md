@@ -44,7 +44,7 @@ which skips with an explanatory message unless you supply the Senate vote-margin
 it reproduces p.393 (7.4253, SE 1.4954, robust CI [4.06975, 10.9833], N 343/310).  The CER scaling and combination structure of the published table are
 checked without the data.  Simulation designs of CCT (2014) supplement S.3.1 provide the other checks.
 
-## Roadmap (out of scope for 0.1)
+## Roadmap (out of scope for 0.1.0)
 
 Covariate adjustment (CCFT 2019), multiple cutoffs/scores, kink designs, McCrary (2008) test, restricted
 density model and jackknife SE, CER arg-min bandwidth, local randomisation / power tools.
