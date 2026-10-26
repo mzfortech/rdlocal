@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rdlocal"
+version = "0.1.0"
+description = "Clean-room regression discontinuity estimation, bandwidths and density test"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [{ name = "Model Zero for Technological Solutions" }]
+dependencies = ["numpy", "scipy", "pandas"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rdlocal"]
+
+[tool.pytest.ini_options]
+markers = ["slow: Monte Carlo tests", "blackbox: compare against reference numbers recorded from rdrobust/rddensity"]
+addopts = "-m 'not slow'"
