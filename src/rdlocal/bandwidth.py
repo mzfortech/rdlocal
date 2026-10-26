@@ -101,71 +101,93 @@ def _global_coef(xc, y, deg, k, side):
 
 
 def _pre_pilot(xc, y, p, kernel):
+    """CCFT supplement S12.1: v_hat = C_K min(s, IQR/1.349) n^(-1/5); C_K = 2.576 (triangular), 1.843 (uniform)."""
     n = len(xc)  # y unused (kept for call symmetry)
     sx = min(np.std(xc, ddof=1), (np.percentile(xc, 75) - np.percentile(xc, 25)) / 1.349)
     return silverman_const(kernel) * sx * n ** (-0.2)
 
 
-# ---------------------------------------------------------------- CCT plug-in
+# ---------------------------------------------------------------- CCFT (2019) supplement, Section 12
 
-def _cct(xc, y, p, q, kernel):
-    """CCT (2014) supplement S.2.6 plug-in, for the three estimands named in CCFT (2017, sec. 2.3):
-    rd (difference of one-sided estimators), two (each side alone), sum (sum of one-sided estimators).
+def _fac(fit: Fit, nu: int, order: int) -> float:
+    """O_{nu,order}(v): nu! * sum_i w_i u_i^(order+1), the finite-sample bias constant of the nu-th
+    coefficient of an order-`order` local fit (CCFT supplement S12, "Bias Constants"; weights w = row nu of
+    (X'WX)^-1 X'W in scaled units, so no bandwidth power appears here)."""
+    return float(factorial(nu) * (fit.coef_weights(nu) @ fit.u ** (order + 1)))
 
-    Returns {variant: (h_left, h_right, b_left, b_right)}.  The variants differ only in which one-sided
-    bias terms are combined (difference, one side, sum) and in whose variances are added.
+
+def _coef_var(fit: Fit, sig2, nu: int) -> float:
+    """Variance of the nu-th Taylor coefficient of the fit (deriv_var without the nu!^2 factor)."""
+    return deriv_var(fit, sig2, nu) / factorial(nu) ** 2
+
+
+def h_given_b(xc, y, p, q, kernel, b, scaleregul=1.0, kind="rd"):
+    """Section 12.3 (Step 3) alone: h for a given bias bandwidth b (common b for rd / sum)."""
+    lam = 3.0 * scaleregul
+    v = _pre_pilot(xc, y, p, kernel)
+    s2 = sigma2_nn(xc, y)
+    S = (1, -1)
+    fb = {s: fit_enough(xc, b, q, kernel, s) for s in S}
+    fp = {s: fit_enough(xc, v, p, kernel, s) for s in S}
+    V0 = sum(v * deriv_var(fp[s], s2, 0) for s in S)
+    kap = {s: _fac(fp[s], 0, p) for s in S}
+    sg = -1 if kind == "rd" else 1
+    Bh = kap[1] * coef(fb[1], y, p + 1) + sg * kap[-1] * coef(fb[-1], y, p + 1)
+    Rh = sum(kap[s] ** 2 * _coef_var(fb[s], s2, p + 1) for s in S)
+    return float((V0 / (2 * (p + 1) * (Bh**2 + lam * Rh))) ** (1 / (3 + 2 * p)))
+
+
+def _cct(xc, y, p, q, kernel, scaleregul=1.0):
+    """CCFT (2019) supplement Section 12 (pp. 65-70), sharp designs, no covariates.
+
+    Step 1: v_hat = C_K C_sd n^(-1/5).
+    Step 2: b_hat = [ (3+2p)/(2(q-p)) * (V/n) / B^2 ]^(1/(3+2q)), V/n and O evaluated at v_hat, the
+            (1+q)-th Taylor coefficient estimated by an order-(1+q) fit at the pilot d_hat.
+    Step 3: h_hat = [ (1/(2(1+p))) * (V/n) / B^2 ]^(1/(3+2p)), B = O_{0,p}(v_hat) * m_{p+1}(b_hat).
+    Regularisation: B^2 -> B^2 + 3*scaleregul*Var(B); the factor 3 and the coefficient scale are not printed
+    in Section 12 and were identified from black-box agreement (see CLEANROOM.md).
+    DEVIATION (d_hat): Section 12.2 defines d_hat through B_ring built from mu_hat^(1+q)(x_pm) at the
+    third/first quartiles x_pm, whose meaning is not recoverable from the text; here d_hat uses the CCT (2014)
+    supplement S.2.6 Step 0 rule (global polynomial of degree q+2) with the finite-sample O of Section 12.
+
+    Returns {variant: (h_left, h_right, b_left, b_right)} for variants rd / sum / two.
     """
     n = len(xc)
+    lam = 3.0 * scaleregul
     v = _pre_pilot(xc, y, p, kernel)
     s2 = sigma2_nn(xc, y)
     S = (1, -1)
 
-    # Step 0 (ii): pilot c_n via global (q+2)-th order polynomial fits.  Estimand-independent.
     fq1 = {s: fit_enough(xc, v, q + 1, kernel, s) for s in S}
-    Vq1 = sum(deriv_var(fq1[s], s2, q + 1) for s in S)
-    Bq1 = lead_const(kernel, q + 1, q + 1)
-    g = _global_coef(xc, y, q + 2, q + 2, 1) - (-1) ** q * _global_coef(xc, y, q + 2, q + 2, -1)
-    Cc = (2 * q + 3) * n * v ** (2 * q + 3) * Vq1 / (2 * Bq1**2 * g**2)
-    c_n = Cc ** (1 / (2 * q + 5)) * n ** (-1 / (2 * q + 5)) if np.isfinite(Cc) and Cc > 0 else v
-    fc = {s: fit_enough(xc, c_n, q + 1, kernel, s) for s in S}
-    cq = {s: coef(fc[s], y, q + 1) for s in S}
-    Vcc = {s: deriv_var(fc[s], s2, q + 1) / factorial(q + 1) ** 2 for s in S}  # DEVIATION 1 (coefficient scale)
+    Vd = {s: v ** (2 * q + 3) * deriv_var(fq1[s], s2, q + 1) for s in S}
+    Od = {s: _fac(fq1[s], q + 1, q + 1) for s in S}
+    Bd = {s: Od[s] * _global_coef(xc, y, q + 2, q + 2, s) for s in S}
     fv = {s: fit_enough(xc, v, q, kernel, s) for s in S}
-    Vpq = {s: deriv_var(fv[s], s2, p + 1) for s in S}
-    Bpq = lead_const(kernel, q, p + 1)
+    Vb = {s: v ** (2 * p + 3) * deriv_var(fv[s], s2, p + 1) for s in S}
+    Ob = {s: _fac(fv[s], p + 1, q) for s in S}
     fp = {s: fit_enough(xc, v, p, kernel, s) for s in S}
-    V0 = {s: deriv_var(fp[s], s2, 0) for s in S}
-    B0 = lead_const(kernel, p, 0)
+    V0 = {s: v * deriv_var(fp[s], s2, 0) for s in S}
+    kap = {s: _fac(fp[s], 0, p) for s in S}
 
-    # sign with which the LEFT one-sided bias enters: difference -> -(-1)^k, sum -> +(-1)^k, k = order+1
-    def comb(a, bm, k, kind):
-        if kind == "rd":
-            return a[1] - (-1) ** k * a[-1]
-        if kind == "sum":
-            return a[1] + (-1) ** k * a[-1]
-        raise ValueError
+    def comb(a, kind, grp):
+        if kind == "two":
+            return a[grp[0]]
+        return a[1] - a[-1] if kind == "rd" else a[1] + a[-1]
 
     out = {}
     for kind in ("rd", "sum", "two"):
-        sides = [(1,), (-1,)] if kind == "two" else [S]
         hh, bb = {}, {}
-        for grp in sides:
-            def tot(d):
-                return sum(d[s] for s in grp)
-            # Step 1: b
-            if kind == "two":
-                d1 = cq[grp[0]]
-            else:
-                d1 = comb(cq, q + 1, q + 1, kind)
-            Cb = (2 * p + 3) * n * v ** (2 * p + 3) * tot(Vpq) / (
-                2 * (q - p) * Bpq**2 * (d1**2 + 3 * tot(Vcc)))
-            b = Cb ** (1 / (2 * q + 3)) * n ** (-1 / (2 * q + 3))
+        for grp in ([(1,), (-1,)] if kind == "two" else [S]):
+            tot = lambda d: sum(d[s] for s in grp)
+            dh = ((3 + 2 * q) / 2 * tot(Vd) / comb(Bd, kind, grp) ** 2) ** (1 / (5 + 2 * q))
+            fd = {s: fit_enough(xc, dh, q + 1, kernel, s) for s in grp}
+            Bb = comb({s: Ob[s] * coef(fd[s], y, q + 1) for s in grp}, kind, grp)
+            Rb = sum(Ob[s] ** 2 * _coef_var(fd[s], s2, q + 1) for s in grp)
+            b = ((3 + 2 * p) / (2 * (q - p)) * tot(Vb) / (Bb**2 + lam * Rb)) ** (1 / (3 + 2 * q))
             fb = {s: fit_enough(xc, b, q, kernel, s) for s in grp}
-            mb = {s: coef(fb[s], y, p + 1) for s in grp}
-            Vb = sum(deriv_var(fb[s], s2, p + 1) for s in grp) / factorial(p + 1) ** 2
-            d2 = mb[grp[0]] if kind == "two" else comb(mb, p + 1, p + 1, kind)
-            Ch = n * v * tot(V0) / (2 * (p + 1) * B0**2 * (d2**2 + 3 * Vb))
-            h = Ch ** (1 / (2 * p + 3)) * n ** (-1 / (2 * p + 3))
+            Bh = comb({s: kap[s] * coef(fb[s], y, p + 1) for s in grp}, kind, grp)
+            Rh = sum(kap[s] ** 2 * _coef_var(fb[s], s2, p + 1) for s in grp)
+            h = (tot(V0) / (2 * (p + 1) * (Bh**2 + lam * Rh))) ** (1 / (3 + 2 * p))
             for s in grp:
                 hh[s], bb[s] = h, b
         out[kind] = (hh[-1], hh[1], bb[-1], bb[1])
@@ -204,7 +226,7 @@ def _ik(xc, y):
 # ---------------------------------------------------------------- public
 
 def rd_bandwidth(y, x, cutoff=0.0, *, fuzzy=None, p=1, q=None, kernel="triangular",
-                 bwselect="mserd", cluster=None) -> BandwidthResult:
+                 bwselect="mserd", cluster=None, scaleregul=1.0) -> BandwidthResult:
     """Data-driven bandwidths for RD estimation.
 
     bwselect: "mse"/"cer" + "rd" (common, default "mserd"), "two" (side-specific), "sum" (MSE of the sum of
@@ -236,19 +258,15 @@ def rd_bandwidth(y, x, cutoff=0.0, *, fuzzy=None, p=1, q=None, kernel="triangula
     if not m:
         raise ValueError("bwselect must be mse|cer + rd|two|sum|comb1|comb2, or ik")
     kind, variant = m.groups()
-    allv = _cct(xc, z, p, q, kernel)
+    allv = _cct(xc, z, p, q, kernel, scaleregul)
     rd, two, sm = allv["rd"], allv["two"], allv["sum"]   # (hl, hr, bl, br)
     if variant in ("rd", "two", "sum"):
         hl, hr, bl, br = allv[variant]
-    elif variant == "comb1":  # CCFT 2017 sec. 2.3: h_comb = min(h_rd, h_sum); b follows the chosen one
-        hl, hr, bl, br = rd if rd[0] <= sm[0] else sm
-    else:  # comb2: per side the median of (two, rd, sum); b of the selected estimator
-        pick = {}
-        for i_, nm in ((0, "l"), (1, "r")):
-            cands = sorted([(two[i_], two[i_ + 2]), (rd[i_], rd[i_ + 2]), (sm[i_], sm[i_ + 2])])
-            pick[nm] = cands[1]
-        hl, bl = pick["l"]
-        hr, br = pick["r"]
+    elif variant == "comb1":  # CCFT 2017 sec. 2.3: min(rd, sum), applied to h and to b separately
+        hl, hr, bl, br = (min(rd[i_], sm[i_]) for i_ in range(4))
+    else:  # comb2: per side the median of (two, rd, sum), for h and for b separately
+        med = lambda i_: sorted([two[i_], rd[i_], sm[i_]])[1]
+        hl, hr, bl, br = (med(i_) for i_ in range(4))
     scale = 1.0
     if kind == "cer":  # CCFT 2017 sec. 2.3 / CCF 2020 sec. 5: n^(-p/((3+p)(3+2p))) h_mse
         N = len(np.unique(cl)) if cl is not None else len(xc)

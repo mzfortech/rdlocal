@@ -13,11 +13,21 @@ its bandwidth section, RJ2015). The Stata Journal 2014 rdrobust article (14(4):9
 downloaded (the ageconsearch record that was tried, 340127, is a different article: Cattaneo et al. 2016 on
 local randomization; its PDF is stored but unused).
 
-**Result of the widening:** these articles state *which* bandwidth selectors exist and how they relate
+**Result of the v0.2 widening:** these articles state *which* bandwidth selectors exist and how they relate
 (CER scaling, combination rules, the generic form h = (V/n / (2(1+p)B))^(1/(3+2p))) but defer the exact
 preliminary (pilot) estimators and the regularisation scaling to the supplemental appendices of CCFT / CJM,
 which are not obtainable. So the data-driven h, b of rdrobust and rddensity cannot be reproduced to 1%
 from permitted text; see "Remaining deviations".
+
+## v0.3: the missing specification
+
+The owner supplied the journal supplements above (hosted under rdpackages.github.io/references/; only those
+files were fetched, nothing else on that site). CCFT2019-S Section 12 specifies the rdrobust-family
+bandwidth selector: Step 1 (pilot v), Step 2 (pilot b, with a further pilot d), Step 3 (h), using finite-sample
+bias constants O(v) and variance constants at v. It does **not** print the regularisation (the factor is
+identified below) and its definition of the d-pilot bias constant (B-ring) is not recoverable. The Senate
+vote-share data (CCFT 2017, Stata Journal) were used **locally for verification only**; they ship inside a GPL
+package and are not redistributed or committed. `tests/test_published_senate.py` skips when absent.
 
 ## Rules followed
 
@@ -46,6 +56,10 @@ from permitted text; see "Remaining deviations".
 | CCFT2017 | Calonico, Cattaneo, Farrell, Titiunik (2017), *rdrobust: Software for regression-discontinuity designs*, Stata Journal 17(2):372-404 (sec. 2.3 bandwidth selectors; sec. 7 published Senate output) | https://ageconsearch.umn.edu/record/340181/files/Calonico.pdf | c41e81d2b3763ea5e2ac060747f7c6a22cf6ae3f7fd27d44dfece82e2fe63c8a |
 | RJ2015 | Calonico, Cattaneo, Titiunik (2015), *rdrobust: An R Package for Robust Nonparametric Inference in RD Designs*, The R Journal 7(1) | https://journal.r-project.org/archive/2015/RJ-2015-004/RJ-2015-004.pdf | b43c6d0f7188e5bcb56f92c99328a9a786ad1f2ef79f9d4ebc8ac6ba1b93b637 |
 | (unused) | Cattaneo, Titiunik, Vazquez-Bare (2016), Stata Journal 16(2) - downloaded by mistake while looking for the 2014 rdrobust article | https://ageconsearch.umn.edu/record/340127/files/Cattaneo.pdf | 957f0118bfcf2559d5ced1ef31d254609086abfbd523a252ff3d38cb1f18e498 |
+| CCFT2019-S | Calonico, Cattaneo, Farrell, Titiunik (2019), *RD Designs Using Covariates*, REStat, **Supplemental Appendix** (87 pp.; Section 12 "Sharp RD Designs: Steps 1-3" pp. 65-70 is the bandwidth implementation spec) | https://rdpackages.github.io/references/Calonico-Cattaneo-Farrell-Titiunik_2019_RESTAT--Supplement.pdf | 53bc60883ac3e28b0e8cefc0b1d299468d56231f9bf0b4c1febfddcc4f91398c |
+| CCF2020-S | Calonico, Cattaneo, Farrell (2020), Econometrics Journal, Supplement (read for CER pilots / residuals; no new constants for the MSE selectors) | https://rdpackages.github.io/references/Calonico-Cattaneo-Farrell_2020_ECTJ--Supplement.pdf | ff2b2bed480fa2210ee1a9f430253a84fe5c2d7f1be8d82c00ba2f5fe71269ed |
+| CCT2014 | Calonico, Cattaneo, Titiunik (2014), Econometrica 82(6) main text | https://rdpackages.github.io/references/cct2014_ecma.pdf | 354d9010ca1f8c3bc98e090a30a498178422b95449a0773e9366757e089ac602 |
+| CFT2015 | Cattaneo, Frandsen, Titiunik (2015), J. Causal Inference (copied with the others; unused) | https://rdpackages.github.io/references/Cattaneo-Frandsen-Titiunik_2015_JCI.pdf | 5f4ca3cc38a9ce2993aac7fcfad1e22e4967e3841d624a931d89fc125b80eabb |
 | CIT2019 | Cattaneo, Idrobo, Titiunik (2019), *A Practical Introduction to RD Designs: Foundations* (arXiv) - consulted for context and for a data source; no formula taken | https://arxiv.org/pdf/1911.09511 | a4f103e8518fb871503c22cceb179a4f614de43edd6d85236a489022b4c67ed3 |
 | Lee2008 | Lee (2008), J. Econometrics - downloaded, only for the data search; not used | https://www.princeton.edu/~davidlee/wp/randomizerdfinal2.pdf | 49c81381c74d9560e5429ba8e279b30f9bd22b2ed3174aa02b0a3ff7f37876d9 |
 
@@ -74,12 +88,13 @@ the McCrary option is not provided), Lee's replication files (see "Published exa
 
 ## DEVIATIONS (where the obtainable papers do not state, or state ambiguously, what was implemented)
 
-1. **Regularisation scale in CCT Steps 1-2.** The printed bracket adds `3 V_hat` (a variance of a
-   *derivative* estimator, carrying `nu!^2`) to a squared Taylor coefficient. We use `3 V_hat / nu!^2`
-   (coefficient scale) so the two terms have the same units. Used verbatim, bandwidths are far smaller
-   (Lee-1 design, n=1000: h = 0.073 vs 0.110 with the coefficient-scale version; black-box value 0.114).
-2. **Step 2 order.** The print writes `beta_{p+1}(b_n)` (an order p+1 fit); we use the order-q fit at b_n,
-   consistent with `V_hat_{p+1,q}(b_n)` in the same bracket. Identical for the default q = p+1.
+1. (resolved in 0.3) Regularisation scale. Section 12 prints no regularisation; black-box agreement fixes it:
+   B^2 -> B^2 + 3 * scaleregul * Var(B), Var(B) = sum over sides of O^2 Var(Taylor coefficient) (coefficient
+   scale, no nu!^2). Given rdrobust's own b, Step 3 then reproduces its h to <=0.3% on all sharp designs with
+   scaleregul = 0 and 1. The 3 and the Var(B) form are an identification from numbers, not from a page.
+2. (resolved in 0.3) Step 2/3 now follow Section 12 (finite-sample O and V at v; C_K = 2.576 / 1.843; b with
+   exponent 1/(3+2q) and h with 1/(3+2p)). The b-stage bias is the order-(1+q) fit coefficient at d_hat with the
+   same regularisation; that structure was confirmed numerically (B(d*) equals the b implied by the black box).
 3. **`msetwo`/`msesum`.** The selectors exist per CCFT2017 sec. 2.3 and the b-per-side structure is confirmed by
    its printed table, but the formulas are ours: the same Step 1-2 expressions with the one-sided bias terms
    (two) or the sum of one-sided bias terms (sum) replacing the difference.
@@ -102,23 +117,24 @@ the McCrary option is not provided), Lee's replication files (see "Published exa
 9. **Empirical CDF.** F(x_i) = (1/(n-1)) sum_{j != i} 1(x_j <= x_i) (the leave-in-free form shown in CJM2020 SA
    Sec. 5.2) rather than including j = i (Sec. 2). Effect O(1/n) on f_hat.
 10. **Density restricted model, jackknife and plug-in SEs** are not implemented (unrestricted model, Thm 2 SE).
-11. **Pilot c_n** uses a global polynomial of degree q+2 (the print says "(m+1)th-order" for a vector
-    r_m = (1,...,x^m); we read it as degree m = q+2). Trying degree q+3 made agreement with the black box worse.
+11. **d_hat pilot (Section 12.2, p.67-68)** - THE remaining cause of selector gaps. The text defines
+    d_hat = [(3+2q)/2 V/n / B_ring^2]^(1/(5+2q)) with B_ring = mu_hat^(1+q)_{1+q}(x_pm) O_{1+q,1+q}(v), x_- /
+    x_+ the third / first quartile of {X<c} / {X>=c}. How mu_hat^(1+q)(x_pm) (an order-(1+q) quantity "at" a
+    quartile) is formed is not recoverable: tried the quartile as a bandwidth, as a window centre, as the point of
+    evaluation of a global polynomial, at v, 2v, side percentiles and with/without regularisation; none matched
+    the d_hat implied by the black box (implied from rdrobust's b under scaleregul 0 and 1). We use the CCT2014
+    supplement S.2.6 Step-0 rule (global polynomial of degree q+2) with the finite-sample O of Section 12.
+    Consequence: 14 of 56 (design x selector x scaleregul) cells are within 1%; the Senate default is at -1.07%
+    (h) and -1.03% (b); worst cells (Lee-1, 2-bandwidth selectors, p=2) are 15%-70% off.
+12. **Fuzzy selector.** The pilot tau_0 (and thus the pseudo-outcome) differs from rdrobust's: fuzzy h is 12% low
+    with scaleregul=1 and 75% low with scaleregul=0 (Lee-fuzzy).
 
-## Remaining deviations after v0.2 (why 1% on h, b is not reached)
+## Remaining deviations after v0.3
 
-* **rdrobust h, b.** Measured gap vs the black box on the five designs: h 6%-31% low, b from 32% low to 4.5% high (see README
-  table); a grid of 36 plausible readings of the printed procedure (pilot polynomial degree, c_n rule, 0/1/3
-  regularisation scaling with and without the nu!^2 factor) never got below 28% max error, and feeding the
-  black box's own b into our Step 2 leaves 0.2%-8% on h. CCFT2017 sec. 2.3 (pp.379-381) says the upgraded
-  selector's preliminary estimates and its regularisation "are discussed in the supplemental appendix of
-  CCFT"; RJ2015 pp.40-41 only gives h_MSE = C n^(-1/(2p+3)) and defers to the supplements of IK and CCT.
-  That supplement is the missing specification.
-* **rddensity h.** CJM2018 sec. 2.5 specifies the family (h_l, h_r, h_diff, h_sum, comb = median / min) but
-  says the constants "rely on preliminary rule-of-thumb estimators" without stating them; CJM2020 sec. 3.1 only
-  says F^(p+1) can come from a local polynomial or "a reference model". A normal-reference reading of that
-  family gave 0.24-0.35 vs the black box's 0.27-0.33 (side-wise) and 0.59-0.96 (pooled): not within 1%.
-  Our default stays the single common h of deviation 8.
+* rdrobust h, b: the d_hat pilot above (CCFT2019-S Section 12.2, p.68, display for B_ring). With it fixed, the rest
+  of the chain (Steps 1 and 3, regularisation, combination and CER rules) is already at <=1%.
+* rddensity h: not specified by either supplement (they do not discuss the density test); the v0.2 rule stays.
+* Fuzzy selector pilot (deviation 12); `msetwo`/`msesum` inherit the d_hat error.
 
 ## Choices informed by black-box agreement (all with a paper passage behind them)
 

@@ -126,15 +126,3 @@ def test_cluster_close_to_rdrobust_nncluster(designs, reference):
     assert r.coef == pytest.approx(rec["coef"][0], rel=1e-9)
     # different cluster residual construction (fit residuals vs nearest-neighbour): within 5%
     assert r.se_robust == pytest.approx(rec["se"][2], rel=5e-2)
-
-
-@pytest.mark.blackbox
-@pytest.mark.parametrize("name", ["lee1", "lee2", "lee3", "fuzzy", "lee1_epa_p2"])
-def test_default_bandwidth_in_same_range_as_rdrobust(designs, reference, name):
-    """Selector gap: observed 6%-31% below rdrobust's h (see README / CLEANROOM deviations)."""
-    rec = reference["rdrobust"][f"{name}|nn"]
-    d = designs["lee1" if name == "lee1_epa_p2" else name]
-    kw = {k: (d[v] if v in d else v) for k, v in CALLS[name].items()}
-    r = rd_estimate(d["y"], d["x"], vce="nn", **kw)
-    assert 0.65 < r.h_right / rec["h"][0] < 1.1
-    assert 0.6 < r.b_right / rec["b"][0] < 1.15

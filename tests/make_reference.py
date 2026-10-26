@@ -36,6 +36,9 @@ def designs():
     d = (rng.uniform(size=1500) < 0.15 + 0.7 * (x >= 0)).astype(float)
     D["fuzzy"] = dict(x=x, y=y + 0.4 * d, d=d)
     D["lee1_epa_p2"] = dict(x=D["lee1"]["x"], y=D["lee1"]["y"])
+    D["lee1_uni"] = dict(x=D["lee1"]["x"], y=D["lee1"]["y"])
+    D["lee2_p2"] = dict(x=D["lee2"]["x"], y=D["lee2"]["y"])
+    D["lee3_p2"] = dict(x=D["lee3"]["x"], y=D["lee3"]["y"])
     rng, x, y = dgp(1, 1200, 16)
     D["cluster"] = dict(x=x, y=y, g=rng.integers(0, 60, 1200).astype(float))
     return D
@@ -50,12 +53,13 @@ def main():
     calls = {
         "lee1": dict(), "lee2": dict(), "lee3": dict(), "fuzzy": dict(fuzzy="d"),
         "lee1_epa_p2": dict(kernel="epanechnikov", p=2, q=3), "cluster": dict(cluster="g"),
+        "lee1_uni": dict(kernel="uniform"), "lee2_p2": dict(p=2, q=3), "lee3_p2": dict(p=2, q=3),
     }
     for name, extra in calls.items():
         d = D[name]
         kw = {k: (d[v] if isinstance(v, str) and v in d else v) for k, v in extra.items()}
         for vce in ("nn", "hc0", "hc1", "hc2", "hc3"):
-            if name == "cluster" and vce != "nn":
+            if (name == "cluster" or name in ("lee1_uni", "lee2_p2", "lee3_p2")) and vce != "nn":
                 continue
             r = rdrobust(d["y"], d["x"], c=0, vce=vce, **kw)
             rec = dict(args={k: (v if not isinstance(v, np.ndarray) else "<array>") for k, v in {**extra, "vce": vce}.items()},
@@ -67,6 +71,15 @@ def main():
             r2 = rdrobust(d["y"], d["x"], c=0, vce=vce, h=rec["h"][0], b=rec["b"][0], **kw)
             rec["fixed_bw"] = dict(h=rec["h"][0], b=rec["b"][0], coef=r2.coef.values.ravel().tolist(),
                                    se=r2.se.values.ravel().tolist(), ci=r2.ci.values.tolist())
+            if vce == "nn":  # bandwidth selectors: no regularisation, and every selector variant
+                bws = {}
+                for reg in (0, 1):
+                    for sel in ("mserd", "msetwo", "msesum", "msecomb1", "msecomb2", "cerrd", "certwo", "cersum"):
+                        if sel not in ("mserd", "cerrd") and name not in ("lee1", "lee2"):
+                            continue
+                        rr = rdrobust(d["y"], d["x"], c=0, vce="nn", bwselect=sel, scaleregul=reg, **kw)
+                        bws[f"{sel}|reg{reg}"] = dict(h=rr.bws.values[0].tolist(), b=rr.bws.values[1].tolist())
+                rec["bws"] = bws
             ref["rdrobust"][f"{name}|{vce}"] = rec
     for name in ("lee1", "lee2", "lee3"):
         x = D[name]["x"]

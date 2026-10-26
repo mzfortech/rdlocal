@@ -74,7 +74,9 @@ def silverman_const(kernel: str) -> float:
     """
     k = kernel_name(kernel)
     if k == "triangular":
-        return 2.58
+        return 2.576  # CCFT supplement S12.1 (uniform: 1.843)
+    if k == "uniform":
+        return 1.843
     k2 = 2 * mom(k, 0, True)
     m2 = 2 * mom(k, 2)
     return float((8 * np.sqrt(np.pi) * k2 / (3 * m2**2)) ** 0.2)

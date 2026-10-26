@@ -95,7 +95,7 @@ def _variance(z, W, fh, hs, p, vce, cl, xc, fb=None, q=None):
 
 
 def rd_estimate(y, x, cutoff=0.0, *, fuzzy=None, p=1, q=None, kernel="triangular", h=None, b=None,
-                bwselect="mserd", vce="hc1", cluster=None, level=0.95) -> RDResult:
+                bwselect="mserd", vce="hc1", cluster=None, level=0.95, scaleregul=1.0) -> RDResult:
     """Local polynomial RD estimate with conventional and robust bias-corrected inference.
 
     Treatment is x >= cutoff.  Conventional: order-p fit at bandwidth h.  Bias-corrected: the
@@ -111,7 +111,7 @@ def rd_estimate(y, x, cutoff=0.0, *, fuzzy=None, p=1, q=None, kernel="triangular
     xc = x - cutoff
     bwsel = bwselect
     if h is None:
-        bw = rd_bandwidth(y, x, cutoff, fuzzy=d, p=p, q=q, kernel=kernel, bwselect=bwselect, cluster=cl)
+        bw = rd_bandwidth(y, x, cutoff, fuzzy=d, p=p, q=q, kernel=kernel, bwselect=bwselect, cluster=cl, scaleregul=scaleregul)
         hl, hr = bw.h_left, bw.h_right
         bl, br = (bw.b_left, bw.b_right) if b is None else (b, b)
     else:
