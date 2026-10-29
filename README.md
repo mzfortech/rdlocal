@@ -53,6 +53,10 @@ density model and jackknife SE, CER arg-min bandwidth, local randomisation / pow
 
 [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) explains the statistics (local polynomial RD, bandwidth selection, robust bias-corrected inference, manipulation testing), how the package was built, and the validation evidence, including the reproduced US Senate results and the one open problem.
 
+## Contributing
+
+Bug reports and research-based contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, testing, and the clean-room rules.
+
 ## Provenance
 
 An independent clean-room implementation written from the papers listed in `CLEANROOM.md`.  It is not
