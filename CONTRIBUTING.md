@@ -32,6 +32,8 @@ The Monte Carlo coverage tests are marked `slow`; run them separately with `pyte
 
 ## Tests and pull requests
 
+Submit changes through a pull request; do not push directly to `main`. A pull request needs at least one approval from someone other than its author, all required CI checks must pass, and open review conversations must be resolved before merge. If you update a pull request after approval, request another review.
+
 Add a focused test for bug fixes and statistical changes. Prefer deterministic inputs and small examples; keep long simulation checks under the `slow` marker. Run the regular suite before opening a pull request, and run the slow suite when changing coverage or simulation behavior.
 
 In the pull request description, explain the problem, summarize the change, list the tests run, and cite research supporting any statistical change. Keep changes focused and update the README or methodology notes when user-visible behavior or limitations change.
