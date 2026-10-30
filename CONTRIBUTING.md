@@ -20,6 +20,8 @@ pytest
 
 The Monte Carlo coverage tests are marked `slow`; run them separately with `pytest -m slow` when changing statistical calculations.
 
+To build the documentation locally, install `docs/requirements.txt` and run `python -m sphinx -W --keep-going -b html docs docs/_build/html`.
+
 ## Clean-room research rules
 
 `rdlocal` is an independent implementation based on published academic papers. Keep contributions within that boundary:

@@ -1,6 +1,6 @@
 # rdlocal methodology
 
-This document explains the statistics rdlocal implements, how it was built, and the evidence that it is correct. For the source-by-source record (papers, checksums, the function-to-equation map and every deviation), see [`CLEANROOM.md`](../CLEANROOM.md).
+This document explains the statistics rdlocal implements, how it was built, and the evidence that it is correct. For the source-by-source record (papers, checksums, the function-to-equation map and every deviation), see [`CLEANROOM.md`](https://github.com/mzfortech/rdlocal/blob/main/CLEANROOM.md).
 
 ## Contents
 
@@ -111,7 +111,7 @@ rdlocal is an **independent, clean-room implementation**:
 - It was written from the published papers, their supplements and the authors' published descriptions of their algorithms, all read in full from the original PDFs. Every formula in the code cites its equation, section and page.
 - The source code, help files and documentation of other RD software were not consulted.
 - Other implementations were used only as **black boxes**: data in, numbers out, to produce reference values for testing.
-- Wherever a paper leaves a step unspecified, the code implements the closest stated version and marks it `DEVIATION`. Every deviation is listed in [`CLEANROOM.md`](../CLEANROOM.md).
+- Wherever a paper leaves a step unspecified, the code implements the closest stated version and marks it `DEVIATION`. Every deviation is listed in [`CLEANROOM.md`](https://github.com/mzfortech/rdlocal/blob/main/CLEANROOM.md).
 
 Two findings from implementation:
 
