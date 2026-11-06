@@ -129,6 +129,14 @@ the McCrary option is not provided), Lee's replication files (see "Published exa
 12. **Fuzzy selector.** The pilot tau_0 (and thus the pseudo-outcome) differs from rdrobust's: fuzzy h is 12% low
     with scaleregul=1 and 75% low with scaleregul=0 (Lee-fuzzy).
 
+13. **Ties in the NN variance.** CCT2014-S S.2.4 defines the estimator with J neighbours, crediting ideas in Abadie and
+    Imbens (2006, not consulted), and does not say what "J nearest" means when points tie.
+    We use all M >= J other points within the distance of the J-th nearest, on the same side, with factor M/(M+1) in place
+    of J/(J+1). That factor is derived, not quoted: Var(Y_i - mean of M) = sigma^2 (1 + 1/M). Choosing J of them
+    by any fixed rule would keep J but make the result depend on row order. Points equidistant up to rounding
+    (16 machine epsilons of |x_i| + d_i, where d_i is the J-th distance) count as ties. No black-box number was used to choose this; the existing
+    NN parity tests still pass at their recorded tolerances.
+
 ## Remaining deviations after development iteration 3
 
 * rdrobust h, b: the d_hat pilot above (CCFT2019-S Section 12.2, p.68, display for B_ring). With it fixed, the rest

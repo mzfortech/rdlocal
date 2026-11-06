@@ -91,7 +91,7 @@ which for $p = 1$ is a factor of $n^{-1/20}$. For the Senate data, $n = 1297$ an
 ## 7. Standard errors
 
 - **HC0–HC3:** heteroskedasticity-robust sandwich forms. HC1 uses the per-side factor $n_s/(n_s - k)$.
-- **Nearest-neighbour (NN):** each residual variance is estimated from the observations with the closest values of $X$.
+- **Nearest-neighbour (NN):** each residual variance is estimated from the observations with the closest values of $X$. Under ties, every observation within the distance of the $J$-th nearest counts as a neighbour, so a result does not depend on row order; see deviation 13 in `CLEANROOM.md`.
 - **Cluster-robust:** built from fit residuals.
 
 ## 8. Manipulation testing
