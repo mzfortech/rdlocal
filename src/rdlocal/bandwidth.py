@@ -33,20 +33,39 @@ class BandwidthResult(Result):
 # ---------------------------------------------------------------- helpers
 
 def _nn_sigma2(x, z, J=3):
-    """Fixed-J nearest-neighbour variance, per observation of ONE side.
+    """Nearest-neighbour variance, per observation of ONE side.
 
-    CCT (2014) supplement S.2.4: sigma2_hat(X_i) = J/(J+1) (Y_i - mean_j Y_{j(i)})^2.
+    CCT (2014) supplement S.2.4: sigma2_hat(X_i) = M/(M+1) (Y_i - mean_j Y_{j(i)})^2 with M = J neighbours.
+    The supplement does not say what "J nearest" means under ties (CLEANROOM.md, deviation 13). Here the neighbours of i are ALL other points within the distance of its J-th nearest, so
+    the set does not depend on row order or on how a search tree breaks ties. M >= J, and M = J without ties.
+    M/(M+1) keeps the estimator unbiased: Var(Y_i - mean of M) = sigma^2 (1 + 1/M).
     """
-    from scipy.spatial import cKDTree
-
+    x, z = np.asarray(x, dtype=float), np.asarray(z, dtype=float)
     m = len(x)
     if m <= J:
         raise ValueError("too few observations for nearest-neighbour variance")
-    d, ind = cKDTree(x[:, None]).query(x[:, None], k=J + 1)
-    selfm = ind == np.arange(m)[:, None]
-    selfm[~selfm.any(axis=1), -1] = True  # tie case: self not among neighbours -> drop farthest
-    nb = ind[~selfm].reshape(m, J)
-    return J / (J + 1) * (z - z[nb].mean(axis=1)) ** 2
+    if not np.isfinite(x).all():
+        raise ValueError("x must be finite")
+    order = np.lexsort((z, x))
+    xs = x[order]
+    # The J nearest others sit within J positions in sorted order, so no search tree is needed.
+    steps = np.arange(1, J + 1)
+    rows = np.arange(m)[:, None]
+    before, after = rows - steps, rows + steps
+    gaps = np.hstack([xs[:, None] - xs[before.clip(0)], xs[after.clip(max=m - 1)] - xs[:, None]])
+    gaps[np.hstack([before < 0, after >= m])] = np.inf
+    d = np.partition(gaps, J - 1, axis=1)[:, J - 1]
+    # A few ulps: points equidistant on a grid differ by rounding error, so they are ties too. Local, so an outlier in x cannot merge distant points.
+    reach = d + 16 * np.finfo(float).eps * (np.abs(xs) + d)
+    lo, hi = np.searchsorted(xs, xs - reach, "left"), np.searchsorted(xs, xs + reach, "right")
+    # The estimator ignores a shift in z, and centring keeps the prefix sums accurate.
+    # shortcut: prefix sums carry rounding error from the largest |z| anywhere (an outlier 1e12 times the scale costs about 1e-3 at single rows, 1e-8 in aggregate); use per-window sums if that ever matters.
+    w = z[order] - z.mean()
+    cum = np.concatenate(([0.0], np.cumsum(w)))
+    M = hi - lo - 1
+    out = np.empty(m)
+    out[order] = M / (M + 1) * (w - (cum[hi] - cum[lo] - w) / M) ** 2
+    return out
 
 
 def sigma2_nn(xc, z, J=3):
